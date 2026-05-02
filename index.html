@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>داش بورد لنا المالية الموحد Live</title>
+<style>
+:root{--bg:#07111f;--card:#0f172a;--card2:#111827;--line:rgba(255,255,255,.12);--text:#f8fafc;--muted:#94a3b8;--accent:#14b8a6}
+*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:radial-gradient(circle at 80% 0%,rgba(20,184,166,.16),transparent 35%),var(--bg);color:var(--text)}
+.wrap{max-width:1400px;margin:auto;padding:22px}.header{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+.title{font-size:28px;font-weight:900}.sub{color:var(--muted);font-size:13px;margin-top:6px}.badge{background:rgba(20,184,166,.14);color:#99f6e4;border:1px solid rgba(20,184,166,.35);padding:8px 14px;border-radius:999px}
+.toolbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0}
+select,button,input{font-family:inherit;border-radius:12px;padding:12px;background:var(--card);color:white;border:1px solid var(--line)}
+button{background:linear-gradient(135deg,var(--accent),#2563eb);border:0;cursor:pointer;font-weight:900}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:14px 0}.card{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 12px 30px rgba(0,0,0,.18)}
+.label{color:var(--muted);font-size:13px;margin-bottom:8px}.value{font-size:25px;font-weight:900;color:#2dd4bf}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.tab{background:var(--card2);border:1px solid var(--line)}.tab.active{background:linear-gradient(135deg,var(--accent),#2563eb)}
+.panel{display:none}.panel.active{display:block}table{width:100%;border-collapse:collapse;background:var(--card);border-radius:16px;overflow:hidden;margin-top:14px}
+th,td{border-bottom:1px solid var(--line);padding:10px;text-align:right;font-size:13px;vertical-align:top}th{background:var(--card2);color:#cbd5e1}.status{color:#cbd5e1;margin-top:8px;line-height:1.8}.err{background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.35);color:#fecaca;border-radius:12px;padding:10px;margin-top:8px}.ok{color:#86efac}
+.chart{height:290px;display:flex;align-items:end;gap:12px;padding:16px;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow-x:auto}.barBox{min-width:92px;height:100%;display:flex;flex-direction:column;justify-content:end;align-items:center;gap:8px}.bar{width:38px;border-radius:10px 10px 2px 2px;background:linear-gradient(180deg,#2dd4bf,#2563eb);min-height:5px}.barLabel{font-size:12px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header"><div><div class="title">داش بورد لنا المالية الموحد Live</div><div class="sub">Google Sheets + Apps Script + Auto Refresh كل 60 ثانية</div><div class="status" id="status">جاهز للتحميل...</div></div><div class="badge">Online Ready</div></div>
+  <div class="toolbar">
+    <button onclick="loadAll()">تحديث البيانات</button>
+    <select id="sourceFilter" onchange="render()"><option value="all">كل الفروع</option><option value="الصيدليات">الصيدليات</option><option value="العيادات">العيادات</option><option value="المجمع">المجمع</option></select>
+    <select id="viewMode" onchange="render()"><option value="all">كل الأعمدة</option><option value="numbers">الأعمدة الرقمية فقط</option></select>
+    <input id="searchBox" oninput="render()" placeholder="بحث في البيانات"/>
+  </div>
+  <div class="grid" id="kpis"></div>
+  <div class="tabs"><button class="tab active" onclick="openTab('overview', this)">نظرة عامة</button><button class="tab" onclick="openTab('details', this)">تفاصيل البيانات</button><button class="tab" onclick="openTab('sources', this)">حالة الربط</button></div>
+  <div id="overview" class="panel active"><div class="card"><div class="label">رسم بياني لأكبر 8 أعمدة رقمية حسب الإجمالي</div><div class="chart" id="mainChart"></div></div></div>
+  <div id="details" class="panel"><div id="tableBox"></div></div>
+  <div id="sources" class="panel"><div class="card"><div class="label">مصادر البيانات</div><div id="sourcesBox"></div></div></div>
+</div>
+<script>
+const UNIFIED_API_URL = "PUT_UNIFIED_API_LINK_HERE";
+let allRows=[],sourceStates=[];
+function toNum(v){if(typeof v==='number')return v;if(v===null||v===undefined||v==='')return 0;const n=Number(String(v).replace(/[,_\s]/g,'').replace(/[^0-9.-]/g,''));return isNaN(n)?0:n}
+function fmt(n){return Number(n||0).toLocaleString('ar-SA',{maximumFractionDigits:0})}
+function loadJSONP(url){return new Promise((resolve,reject)=>{const cb='jsonp_cb_'+Date.now();window[cb]=(data)=>{delete window[cb];script.remove();resolve(data)};const script=document.createElement('script');script.src=url+(url.includes('?')?'&':'?')+'callback='+cb+'&t='+Date.now();script.onerror=()=>{delete window[cb];script.remove();reject(new Error('تعذر تحميل API الموحد'))};document.body.appendChild(script);})}
+async function loadAll(){const status=document.getElementById('status');if(!UNIFIED_API_URL||UNIFIED_API_URL.includes('PUT_')){status.innerHTML='<span class="err">ضع رابط API الموحد داخل index.html أولاً</span>';return}status.textContent='جاري تحميل البيانات...';try{const data=await loadJSONP(UNIFIED_API_URL);allRows=data.rows||[];sourceStates=data.sources||[];status.innerHTML=`تم التحديث | إجمالي الصفوف: <b>${fmt(allRows.length)}</b> | آخر تحديث: ${new Date().toLocaleString('ar-SA')}`;render()}catch(e){status.innerHTML='<span class="err">'+e.message+'</span>'}}
+function filteredRows(){const src=document.getElementById('sourceFilter').value,q=document.getElementById('searchBox').value.trim();return allRows.filter(r=>(src==='all'||r['المصدر']===src)&&(!q||Object.values(r).some(v=>String(v??'').includes(q))))}
+function numericKeys(rows){const keys=[...new Set(rows.flatMap(r=>Object.keys(r)))].filter(k=>k!=='المصدر');return keys.filter(k=>rows.some(r=>Math.abs(toNum(r[k]))>0))}
+function renderKPIs(rows){const kpis=document.getElementById('kpis'),nums=numericKeys(rows),sourceCount=[...new Set(rows.map(r=>r['المصدر']))].length;let html=`<div class="card"><div class="label">عدد الصفوف</div><div class="value">${fmt(rows.length)}</div></div><div class="card"><div class="label">عدد الفروع</div><div class="value">${fmt(sourceCount)}</div></div>`;html+=nums.slice(0,4).map(k=>`<div class="card"><div class="label">${k}</div><div class="value">${fmt(rows.reduce((a,r)=>a+toNum(r[k]),0))} ر.س</div></div>`).join('');kpis.innerHTML=html}
+function renderChart(rows){const el=document.getElementById('mainChart'),nums=numericKeys(rows).map(k=>[k,rows.reduce((a,r)=>a+Math.abs(toNum(r[k])),0)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,8),max=Math.max(1,...nums.map(x=>x[1]));el.innerHTML=nums.length?nums.map(([k,v])=>`<div class="barBox"><div class="bar" style="height:${Math.max(5,Math.round(v/max*220))}px"></div><div class="barLabel">${k}<br>${fmt(v)}</div></div>`).join(''):'<div class="status">لا توجد بيانات رقمية</div>'}
+function renderTable(rows){const box=document.getElementById('tableBox');if(!rows.length){box.innerHTML='<div class="err">لا توجد بيانات</div>';return}const allKeys=[...new Set(rows.flatMap(r=>Object.keys(r)))],nums=numericKeys(rows),keys=document.getElementById('viewMode').value==='numbers'?['المصدر',...nums]:allKeys;box.innerHTML=`<table><thead><tr>${keys.map(k=>`<th>${k}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,500).map(r=>`<tr>${keys.map(k=>`<td>${r[k]??''}</td>`).join('')}</tr>`).join('')}</tbody></table>`}
+function renderSources(){document.getElementById('sourcesBox').innerHTML=`<table><thead><tr><th>المصدر</th><th>الحالة</th><th>عدد الصفوف</th><th>ملاحظة</th></tr></thead><tbody>${sourceStates.map(s=>`<tr><td>${s.source}</td><td>${s.ok?'<span class="ok">تم الربط</span>':'<span class="err">خطأ</span>'}</td><td>${s.count||0}</td><td>${s.error||''}</td></tr>`).join('')}</tbody></table>`}
+function render(){const rows=filteredRows();renderKPIs(rows);renderChart(rows);renderTable(rows);renderSources()}
+function openTab(id,btn){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById(id).classList.add('active');btn.classList.add('active')}
+setInterval(loadAll,60000);loadAll();
+</script>
+</body>
+</html>
