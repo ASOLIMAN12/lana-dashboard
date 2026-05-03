@@ -36,7 +36,7 @@ th,td{border-bottom:1px solid var(--line);padding:10px;text-align:right;font-siz
   <div id="sources" class="panel"><div class="card"><div class="label">مصادر البيانات</div><div id="sourcesBox"></div></div></div>
 </div>
 <script>
-const UNIFIED_API_URL = "https://script.google.com/macros/library/d/1ri6E6s6j1I6-QpbN89iKvkQf4CVnAjA4X_VTXCo2lrmtpu4xv6C7cN9H/1";
+const UNIFIED_API_URL = "https://script.google.com/macros/s/AKfycbwpP42tkB0Rlg2Cv3TD9Nuuk6JS5hcZ5lPpU81clV-KXj5D77fJtYEeZYSq9xfTEpl8/exec";
 let allRows=[],sourceStates=[];
 function toNum(v){if(typeof v==='number')return v;if(v===null||v===undefined||v==='')return 0;const n=Number(String(v).replace(/[,_\s]/g,'').replace(/[^0-9.-]/g,''));return isNaN(n)?0:n}
 function fmt(n){return Number(n||0).toLocaleString('ar-SA',{maximumFractionDigits:0})}
